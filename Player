@@ -1,0 +1,174 @@
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class Player : MonoBehaviour
+{
+    private Rigidbody rb;
+    public GameObject playerCam;
+    public Transform orientation;
+    private Animator anim;
+    // Movement
+    [Header("Movement")]
+    [SerializeField] private float moveSpeed = 3000f;
+    [SerializeField] private float maxSpeed = 10f;
+    [SerializeField] private float counterMovement = 0.2f;
+    [SerializeField] private float jumpForce = 600f;
+    private float x, y;
+    private float threshold = 0.1f;
+    // Jump
+    [Header("Jump")]
+    public LayerMask whatIsGround;
+    public Transform groundDetection;
+    public BoxCollider groundDetectionCollider;
+    private bool readyToJump = true;
+    private bool wantsToJump = false;
+    // Look
+    [Header("Look")]
+    [SerializeField] private float sensitivity = 50f;
+    [SerializeField] private float sensitivityMultiplier = 1f;
+    private float xRotation;
+
+    public static Action shootInput;
+    public static Action reloadInput;
+
+    void Start()
+    {
+        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.visible = false;
+
+        rb = GetComponent<Rigidbody>();
+        anim = GetComponent<Animator>();
+    }
+
+    // Inputs bei Update
+    void Update()
+    {
+        Inputs();
+        Look();
+    }
+
+    // Physics bei FixedUpdate
+	void FixedUpdate()
+	{
+        Movement();
+        Jump();
+    }
+
+    private void Inputs()
+    {
+        // Jump
+        if (Input.GetKeyDown(KeyCode.Space) && IsGrounded() && readyToJump)
+        {
+            wantsToJump = true;
+        }
+
+        // Movement
+        x = Input.GetAxisRaw("Horizontal") * moveSpeed * Time.deltaTime;
+        y = Input.GetAxisRaw("Vertical") * moveSpeed * Time.deltaTime;
+
+        // Shoot
+        if (Input.GetMouseButton(0))
+        {
+            shootInput?.Invoke();
+        }
+        // Reload
+        if (Input.GetKeyDown(KeyCode.R))
+        {
+            reloadInput?.Invoke();
+        }
+
+		// Sprint
+		if (Input.GetKeyDown(KeyCode.LeftShift))
+		{
+            maxSpeed *= 1.5f;
+        }
+        if (Input.GetKeyUp(KeyCode.LeftShift))
+        {
+            maxSpeed /= 1.5f;
+        }
+    }
+
+    #region Movement
+    private void Movement()
+    {
+        Vector2 mag = FindVelRelativeToLook();
+        float xMag = mag.x, yMag = mag.y;
+
+        // Counter Movement
+        if (Mathf.Abs(mag.x) > threshold && Mathf.Abs(x) < 0.05f || (mag.x < -threshold && x > 0) || (mag.x > threshold && x < 0))
+            rb.AddForce(moveSpeed * transform.right * Time.deltaTime * -mag.x * counterMovement);
+        if (Mathf.Abs(mag.y) > threshold && Mathf.Abs(y) < 0.05f || (mag.y < -threshold && y > 0) || (mag.y > threshold && y < 0))
+            rb.AddForce(moveSpeed * transform.forward * Time.deltaTime * -mag.y * counterMovement);
+
+        // disable Input when max Speed
+        if (x > 0 && xMag > maxSpeed) x = 0;
+        if (x < 0 && xMag < -maxSpeed) x = 0;
+        if (y > 0 && yMag > maxSpeed) y = 0;
+        if (y < 0 && yMag < -maxSpeed) y = 0;
+
+        rb.AddForce(transform.right * Time.deltaTime * moveSpeed * x, ForceMode.Force);
+        rb.AddForce(transform.forward * Time.deltaTime * moveSpeed * y, ForceMode.Force);
+
+        anim.SetFloat("Velocity X", -rb.velocity.x);
+        anim.SetFloat("Velocity Z", -rb.velocity.z);
+    }
+
+    // Find the velocity relative to where the Player is looking
+    public Vector2 FindVelRelativeToLook()
+	{
+        float lookAngle = transform.eulerAngles.y;
+        float moveAngle = Mathf.Atan2(rb.velocity.x, rb.velocity.z) * Mathf.Rad2Deg;
+
+        float u = Mathf.DeltaAngle(lookAngle, moveAngle);
+        float v = 90 - u;
+
+        float magnitude = rb.velocity.magnitude;
+        float yMag = magnitude * Mathf.Cos(u * Mathf.Deg2Rad);
+        float xMag = magnitude * Mathf.Cos(v * Mathf.Deg2Rad);
+
+        return new Vector2(xMag, yMag);
+	}
+
+    private void Jump()
+	{
+        if (wantsToJump)
+        {
+            wantsToJump = false;
+            readyToJump = false;
+            rb.AddForce(Vector3.up * Time.deltaTime * jumpForce, ForceMode.Impulse);
+            Invoke(nameof(ResetJump), 0.25f);
+        }
+        if (IsGrounded() == false)
+            rb.AddForce(Vector3.down * Time.deltaTime * 500f);
+    }
+
+    private void ResetJump() => readyToJump = true;
+
+	private bool IsGrounded()
+	{
+        if (Physics.CheckBox(groundDetection.position, groundDetectionCollider.size / 2, Quaternion.identity, whatIsGround))
+            return true;
+        else
+            return false;
+	}
+
+    private void Look()
+	{
+        float mouseX = Input.GetAxis("Mouse X") * sensitivity * Time.fixedDeltaTime * sensitivityMultiplier;
+        float mouseY = Input.GetAxis("Mouse Y") * sensitivity * Time.fixedDeltaTime * sensitivityMultiplier;
+
+        Vector3 rotation = playerCam.transform.rotation.eulerAngles;
+        float desiredX = rotation.y + mouseX;
+
+        xRotation -= mouseY;
+        xRotation = Mathf.Clamp(xRotation, -70f, 70f);
+
+        playerCam.transform.position = orientation.position;
+        playerCam.transform.rotation = Quaternion.Euler(xRotation, desiredX, 0);
+        orientation.transform.localRotation = Quaternion.Euler(0, desiredX, 0);
+        transform.rotation = Quaternion.Euler(0, desiredX, 0);
+    }
+    #endregion
+}
