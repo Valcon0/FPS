@@ -1,0 +1,39 @@
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class Weapon : MonoBehaviour
+{
+	public WeaponData weaponData;
+	private float timeSinceLastShot = 1f;
+
+	private void Start()
+	{
+		Player.shootInput += Shoot;
+		Player.reloadInput += Reload;
+	}
+
+	private void Shoot()
+	{																							 v
+		if((weaponData.magazineSize > 0) && (weaponData.currentAmmo > 0) && CanShoot())
+		{
+				Debug.Log("shoot");
+				weaponData.currentAmmo--;
+		}
+	}
+
+	private void Reload()
+	{
+		if (CanReload() && weaponData.currentAmmo < weaponData.magazineSize)
+		{
+			Debug.Log("reload");
+			weaponData.currentAmmo = weaponData.magazineSize;
+		}
+	}
+
+	//example: 600 rpm / 60s = 10 rps		1s / 10 rps = 0.1s per shot
+	private bool CanShoot() => (!weaponData.isReloading) && (timeSinceLastShot > 1f / (weaponData.fireRate / 60f));
+
+	public bool CanReload() => (weaponData.currentAmmo < weaponData.magazineSize) && !weaponData.isReloading;
+}
