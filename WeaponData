@@ -1,0 +1,26 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+[CreateAssetMenu(menuName = ("Weapons/WeaponData"), order = 0)]
+public class WeaponData : ScriptableObject
+{
+	public string id;
+	public new string name;
+	public int damage;
+
+	public GameObject modelPrefab;
+
+	public float fireRate = 0.1f;
+	public int magazineSize = 30;
+	public int maxAmmo = 180;
+	[HideInInspector]
+	public int currentAmmo;
+	[HideInInspector]
+	public bool isReloading = false;
+
+	private void Awake()
+	{
+		currentAmmo = magazineSize;
+	}
+}
